@@ -21,7 +21,7 @@ req.add(crtc, {"ACTIVE": 1,
 r = req.commit_sync(allow_modeset = True)
 assert r == 0, "Initial commit failed: %d" % r
 
-fbX = 1920
+fbX = mode.hdisplay
 fbY = 10
 
 black = pykms.RGB(0, 0, 0)
@@ -31,7 +31,10 @@ white = pykms.RGB(255, 255, 255)
 
 fb=[]
 
-for i in range (0, 192):
+stripe_size=10
+num_stripes = int(mode.hdisplay/stripe_size)
+
+for i in range (0, num_stripes):
 	fb.append(pykms.DumbFramebuffer(card, fbX, fbY, format));
 	pykms.draw_rect(fb[i], 0, 0, fbX, fbY, black)
 	pykms.draw_rect(fb[i], i*10, 0, 10, fbY, white)
@@ -43,33 +46,32 @@ planes.append(res.reserve_generic_plane(crtc, format))
 planes.append(res.reserve_generic_plane(crtc, format))
 planes.append(res.reserve_generic_plane(crtc, format))
 
+assert len(planes)>=4, "at least 4 planes required, got %d" % len(planes)
+
 red_fb = pykms.DumbFramebuffer(card, fbX, fbY, format);
 pykms.draw_rect(red_fb, 0, 0, fbX, fbY, red)
 
 green_fb = pykms.DumbFramebuffer(card, fbX, fbY, format);
 pykms.draw_rect(green_fb, 0, 0, fbX, fbY, green)
 
-sleep = 0.002
+mdst = (0, 0, mode.hdisplay, mode.vdisplay)
 
 zpos = 0
 fb_ind = 0
-
 toggle=1
 
 while True:
-#	sleep = sleep + 0.000001
-	time.sleep(sleep)
 	req = pykms.AtomicReq(card)
 
-	req.add_plane(planes[0], green_fb, crtc, dst=(0, 0, fbX, 1080), zpos=0)
+	req.add_plane(planes[0], green_fb, crtc, dst=mdst, zpos=0)
 	if toggle:
-		req.add_plane(planes[1], red_fb, crtc, dst=(0, 0, fbX, 1080), zpos=1)
+		req.add_plane(planes[1], red_fb, crtc, dst=mdst, zpos=1)
 		req.add_plane(planes[1], None, None, zpos=1)
 	else:
-		req.add_plane(planes[2], red_fb, crtc, dst=(0, 0, fbX, 1080), zpos=1)
+		req.add_plane(planes[2], red_fb, crtc, dst=mdst, zpos=1)
 		req.add_plane(planes[2], None, None, zpos=1)
 
-	req.add_plane(planes[3], fb[fb_ind], crtc, dst=(0, 0, fbX, 1080), zpos=2)
+	req.add_plane(planes[3], fb[fb_ind], crtc, dst=mdst, zpos=2)
 
 	r = req.commit_sync()
 	assert r == 0, "Plane commit failed: %d" % r
