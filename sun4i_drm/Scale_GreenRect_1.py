@@ -8,7 +8,8 @@ res = pykms.ResourceManager(card)
 conn = res.reserve_connector('')
 crtc = res.reserve_crtc(conn)
 
-format = pykms.PixelFormat.ARGB8888
+format = pykms.PixelFormat.XRGB8888
+green = pykms.RGB(0, 255, 0)
 
 card.disable_planes()
 
@@ -21,65 +22,41 @@ req.add(crtc, {"ACTIVE": 1,
 r = req.commit_sync(allow_modeset = True)
 assert r == 0, "Initial commit failed: %d" % r
 
-fbX = 1920
-fbY = 10
+fbX = mode.hdisplay
+fbY = mode.vdisplay
 
-black = pykms.RGB(0, 0, 0)
-red = pykms.RGB(255, 0, 0)
-green = pykms.RGB(0, 255, 0)
-white = pykms.RGB(255, 255, 255)
+fb_full = pykms.DumbFramebuffer(card, fbX, fbY, format);
+pykms.draw_rect(fb_full, int(fbX*0.1), int(fbY*0.1), int(fbX*0.8), int(fbY*0.8), green)
 
-fb=[]
+fbX = int(fbX/2)
+fbY = int(fbY/2)
 
-for i in range (0, 192):
-	fb.append(pykms.DumbFramebuffer(card, fbX, fbY, format));
-	pykms.draw_rect(fb[i], 0, 0, fbX, fbY, black)
-	pykms.draw_rect(fb[i], i*10, 0, 10, fbY, white)
-
-	req.add(plane2, {"alpha": alpha })
+fb_half = pykms.DumbFramebuffer(card, fbX, fbY, format);
+pykms.draw_rect(fb_half, int(fbX*0.1), int(fbY*0.1), int(fbX*0.8), int(fbY*0.8), green)
 
 planes=[]
 
-planes.append(res.reserve_generic_plane(crtc, format))
-planes.append(res.reserve_generic_plane(crtc, format))
-planes.append(res.reserve_generic_plane(crtc, format))
-planes.append(res.reserve_generic_plane(crtc, format))
+max_planes=16
 
-red_fb = pykms.DumbFramebuffer(card, fbX, fbY, format);
-pykms.draw_rect(red_fb, 0, 0, fbX, fbY, red)
+frame_time = 1 / mode.vrefresh
+commit_point = frame_time * 0.5
 
-green_fb = pykms.DumbFramebuffer(card, fbX, fbY, format);
-pykms.draw_rect(green_fb, 0, 0, fbX, fbY, green)
+for i in range(max_planes):
+    p = res.reserve_generic_plane(crtc)
+    if p == None:
+        break
+    planes.append(p)
 
-sleep = 0.002
+def PlaneAlphaTest(plane_index):
+	card.disable_planes()
+	print("Testing plane {}".format(plane_index))
+	for i in range(0, 60):
+		time.sleep(commit_point)
 
-zpos = 0
-fb_ind = 0
+		req = pykms.AtomicReq(card)
+		req.add_plane(planes[plane_index], fb_full if i%2 else fb_half, crtc, dst=(0, 0, 1920, 1080), zpos=0)
+		r = req.commit_sync()
+		assert r == 0, "Plane commit failed: %d" % r
 
-toggle=1
-
-while True:
-#	sleep = sleep + 0.000001
-	time.sleep(sleep)
-	req = pykms.AtomicReq(card)
-
-	req.add_plane(planes[0], green_fb, crtc, dst=(0, 0, fbX, 1080), zpos=0)
-	if toggle:
-		req.add_plane(planes[1], red_fb, crtc, dst=(0, 0, fbX, 1080), zpos=1)
-		req.add_plane(planes[1], None, None, zpos=1)
-	else:
-		req.add_plane(planes[2], red_fb, crtc, dst=(0, 0, fbX, 1080), zpos=1)
-		req.add_plane(planes[2], None, None, zpos=1)
-
-	req.add_plane(planes[3], fb[fb_ind], crtc, dst=(0, 0, fbX, 1080), zpos=2)
-
-	r = req.commit_sync()
-	assert r == 0, "Plane commit failed: %d" % r
-
-	zpos = zpos + 1
-	if zpos >= 3:
-		zpos = 0
-
-	toggle = not toggle
-
-	fb_ind = (fb_ind + 1) % len(fb)
+for i in range(0, len(planes)):
+	PlaneAlphaTest(i)
