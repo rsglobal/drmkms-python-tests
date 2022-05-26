@@ -58,5 +58,12 @@ def PlaneAlphaTest(plane_index):
 		r = req.commit_sync()
 		assert r == 0, "Plane commit failed: %d" % r
 
+print(
+"""
+	Green rectangle scaling test
+	Rectangle must appear on the screen without visible artifacts
+	It's ok to see slightly smoothed edges.
+""")
+
 for i in range(0, len(planes)):
 	PlaneAlphaTest(i)
