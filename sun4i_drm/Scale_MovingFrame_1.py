@@ -39,7 +39,7 @@ fb3 = pykms.DumbFramebuffer(card, fbX, fbY, format);
 pykms.draw_test_pattern(fb3);
 
 max_downscale_x=5
-max_downscale_y=8
+max_downscale_y=4
 
 W = 640
 H = 480
@@ -52,7 +52,7 @@ Hinc = 1
 Xinc = 1
 Yinc = 1
 
-sleep = 0.002
+sleep = 0.005
 
 primary_h = 1080
 # Uncomment this line to reproduce incorrect mixer region issue:
@@ -80,8 +80,8 @@ while True:
 		Hinc = -1
 	if (Hinc == -1 and H <= fbY/max_downscale_y):
 		Hinc = 1
-	X = X + Xinc
-	Y = Y + Yinc
+	X = X + Xinc * 4
+	Y = Y + Yinc * 4
 	if (Xinc == 1 and X >= mode.hdisplay - W):
 		Xinc = -1
 	if (Xinc == -1 and X <= 0):
